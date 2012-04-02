@@ -20,12 +20,21 @@
  * # echo 9184 > trigger_port 
  * # cat backlight_file 
  * /sys/class/backlight/s5p_bl/brightness
+ * # cat delay_ms 
+ * 100
  * # cat trigger_port 
  * 9184
  * # nc localhost 9184
  * ZX2C4-Laptop [127.0.0.1] 9184 (?) : Connection refused
- * # dmesg | tail -n 1
- * [  789.250531] blinker: connected to the magic port 9184
+ * # dmesg | tail -n 4
+ * [  910.109435] blinker: connected to the magic port 9184
+ * [  910.109466] blinker: read backlight level of 8
+ * [  910.110363] blinker: set backlight to 0
+ * [  910.212381] blinker: restored backlight
+ * 
+ * Development note:
+ *     Though this is intended to work on Android/ARM, presently it is only
+ *     implemented on x86. Work in progress.
  *
  */
 
