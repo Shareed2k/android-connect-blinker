@@ -1,4 +1,4 @@
-obj-m	:= inet-connect-hook.o
+obj-m	:= blinker.o
 
 KDIR	:= /lib/modules/$(shell uname -r)/build
 PWD	:= $(shell pwd)
