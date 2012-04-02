@@ -34,12 +34,15 @@
 #include <linux/socket.h>
 #include <linux/in.h>
 #include <linux/proc_fs.h>
+#include <linux/cred.h>
+#include <linux/fs.h>
 #include <asm/uaccess.h>
 
 
 #define PROC_BLINKER	"blinker"
 #define PROC_PORT	"trigger_port"
 #define PROC_FILE	"backlight_file"
+#define PROC_DELAY	"delay_ms"
 #define MAX_LENGTH	512
 
 MODULE_LICENSE("GPL");
@@ -47,11 +50,10 @@ MODULE_AUTHOR("Jason A. Donenfeld");
 MODULE_DESCRIPTION("Android Screen Blinker");
 
 extern struct proto_ops inet_stream_ops;
+extern void msleep_interruptible(unsigned long msecs);
 
-static struct proc_dir_entry *proc_blinker;
-static struct proc_dir_entry *proc_port;
-static struct proc_dir_entry *proc_file;
-static unsigned int trigger_port;
+static struct proc_dir_entry *proc_blinker, *proc_port, *proc_file, *proc_delay;
+static unsigned int trigger_port, delay_ms;
 static unsigned char backlight_file[MAX_LENGTH];
 
 static void disable_page_protection(void)
@@ -73,13 +75,59 @@ static void enable_page_protection(void)
 	}
 }
 
+void blink(void)
+{
+	struct file *filp;
+	struct cred *creds;
+	mm_segment_t oldfs;
+	unsigned long long offset;
+	char buf[MAX_LENGTH];
+	unsigned long previous_backlight;
+	
+	creds = prepare_creds();
+	commit_creds(prepare_kernel_cred(NULL));
+	
+	oldfs = get_fs();
+	set_fs(get_ds());
+	
+	filp = filp_open(backlight_file, O_RDWR, 0);
+	if(IS_ERR(filp))
+		goto error;
+	offset = 0;
+	vfs_read(filp, buf, MAX_LENGTH - 1, &offset);
+	buf[MAX_LENGTH - 1] = 0;
+	sscanf(buf, "%lu", &previous_backlight);
+	printk(KERN_INFO "blinker: read backlight level of %lu", previous_backlight);
+	
+	offset = 0;
+	vfs_write(filp, "0\n", 2, &offset);
+	generic_file_fsync(filp, 0, 2, 0);
+	printk(KERN_INFO "blinker: set backlight to 0\n");
+	
+	msleep_interruptible(100);
+	
+	snprintf(buf, MAX_LENGTH, "%lu\n", previous_backlight);
+	vfs_write(filp, buf, MAX_LENGTH, &offset);
+	printk(KERN_INFO "blinker: restored backlight\n");
+	
+	filp_close(filp, NULL);
+	
+	goto out;
+	
+error:
+	printk(KERN_ERR "blinker: could not work with %s, error %ld\n", backlight_file, PTR_ERR(filp));
+out:
+	set_fs(oldfs);
+	commit_creds(creds);
+}
+
 int (*old_connect)(struct socket *sock, struct sockaddr *uaddr, int sockaddr_len, int flags);
 int connect(struct socket *sock, struct sockaddr *uaddr, int sockaddr_len, int flags)
 {
 	struct sockaddr_in *usin = (struct sockaddr_in *)uaddr;
 	if (ntohl(usin->sin_addr.s_addr) == 2130706433 && ntohs(usin->sin_port) == trigger_port) {
 		printk(KERN_INFO "blinker: connected to the magic port %u\n", trigger_port);
-		//TODO: blink the screen
+		blink();
 	}
 	return (*old_connect)(sock, uaddr, sockaddr_len, flags);
 }
@@ -96,7 +144,6 @@ int port_write(struct file *file, const char __user *ubuf, unsigned long count, 
 	sscanf(buf, "%u", &trigger_port);
 	return count;
 }
-
 int port_read(char *page, char **start, off_t off, int count, int *eof, void *data)
 {
 	printk(KERN_INFO "blinker: called get_port\n");
@@ -118,12 +165,30 @@ int file_write(struct file *file, const char __user *ubuf, unsigned long count, 
 	memcpy(backlight_file, buf, sizeof(backlight_file));
 	return count;
 }
-
 int file_read(char *page, char **start, off_t off, int count, int *eof, void *data)
 {
 	printk(KERN_INFO "blinker: called get_file\n");
 	return snprintf(page, MAX_LENGTH, "%s\n", backlight_file);
 }
+int delay_write(struct file *file, const char __user *ubuf, unsigned long count, void *data)
+{
+	char buf[MAX_LENGTH];
+	printk(KERN_INFO "blinker: called set_delay\n");
+	memset(buf, 0, sizeof(buf));
+	if (count > MAX_LENGTH - 1)
+		count = MAX_LENGTH - 1;
+	if (copy_from_user(&buf, ubuf, count))
+		return -EFAULT;
+	buf[MAX_LENGTH - 1] = 0;
+	sscanf(buf, "%u", &delay_ms);
+	return count;
+}
+int delay_read(char *page, char **start, off_t off, int count, int *eof, void *data)
+{
+	printk(KERN_INFO "blinker: called get_delay\n");
+	return snprintf(page, MAX_LENGTH, "%u\n", delay_ms);
+}
+
 static int init(void)
 {
 	proc_blinker = proc_mkdir(PROC_BLINKER, NULL);
@@ -133,6 +198,9 @@ static int init(void)
 	proc_file = create_proc_entry(PROC_FILE, 0600, proc_blinker);
 	proc_file->read_proc = file_read;
 	proc_file->write_proc = file_write;
+	proc_delay = create_proc_entry(PROC_DELAY, 0600, proc_blinker);
+	proc_delay->read_proc = delay_read;
+	proc_delay->write_proc = delay_write;
 	printk(KERN_INFO "blinker: created /proc/blinker/\n");
 
 	old_connect = inet_stream_ops.connect;
@@ -142,6 +210,7 @@ static int init(void)
 	printk(KERN_INFO "blinker: remapped inet_stream_ops.connect\n");
 
 	trigger_port = 9191;
+	delay_ms = 100;
 	strcpy(backlight_file, "/sys/class/backlight/s5p_bl/brightness");
 
 	return 0;
@@ -155,6 +224,7 @@ static void exit(void)
 
 	remove_proc_entry(PROC_PORT, proc_blinker);
 	remove_proc_entry(PROC_FILE, proc_blinker);
+	remove_proc_entry(PROC_DELAY, proc_blinker);
 	remove_proc_entry(PROC_BLINKER, NULL);
 	printk(KERN_INFO "blinker: removed /proc/blinker/\n");
 }
