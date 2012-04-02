@@ -113,7 +113,7 @@ void blink(void)
 	generic_file_fsync(filp, 0, 2, 0);
 	printk(KERN_INFO "blinker: set backlight to 0\n");
 	
-	msleep_interruptible(100);
+	msleep_interruptible(delay_ms);
 	
 	snprintf(buf, MAX_LENGTH, "%lu\n", previous_backlight);
 	vfs_write(filp, buf, MAX_LENGTH, &offset);
