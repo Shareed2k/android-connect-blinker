@@ -6,8 +6,10 @@
 #include <asm/uaccess.h>
 
 
-#define PROC_BLINKER_PORT	"blinker_port"
-#define MAX_LENGTH		16
+#define PROC_BLINKER	"blinker"
+#define PROC_PORT	"trigger_port"
+#define PROC_FILE	"backlight_file"
+#define MAX_LENGTH	512
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Jason A. Donenfeld");
@@ -15,8 +17,11 @@ MODULE_DESCRIPTION("Android Screen Blinker");
 
 extern struct proto_ops inet_stream_ops;
 
-static struct proc_dir_entry *proc_blinker_port;
-static unsigned int port;
+static struct proc_dir_entry *proc_blinker;
+static struct proc_dir_entry *proc_port;
+static struct proc_dir_entry *proc_file;
+static unsigned int trigger_port;
+static unsigned char backlight_file[MAX_LENGTH];
 
 static void disable_page_protection(void)
 {
@@ -41,13 +46,13 @@ int (*old_connect)(struct socket *sock, struct sockaddr *uaddr, int sockaddr_len
 int connect(struct socket *sock, struct sockaddr *uaddr, int sockaddr_len, int flags)
 {
 	struct sockaddr_in *usin = (struct sockaddr_in *)uaddr;
-	if (ntohl(usin->sin_addr.s_addr) == 2130706433 && ntohs(usin->sin_port) == port) {
-		printk(KERN_INFO "blinker: connected to the magic port %u\n", port);
+	if (ntohl(usin->sin_addr.s_addr) == 2130706433 && ntohs(usin->sin_port) == trigger_port) {
+		printk(KERN_INFO "blinker: connected to the magic port %u\n", trigger_port);
 		//TODO: blink the screen
 	}
 	return (*old_connect)(sock, uaddr, sockaddr_len, flags);
 }
-int set_port(struct file *file, const char __user *ubuf, unsigned long count, void *data)
+int port_write(struct file *file, const char __user *ubuf, unsigned long count, void *data)
 {
 	char buf[MAX_LENGTH];
 	printk(KERN_INFO "blinker: called set_port\n");
@@ -56,25 +61,51 @@ int set_port(struct file *file, const char __user *ubuf, unsigned long count, vo
 		count = MAX_LENGTH;
 	if (copy_from_user(&buf, ubuf, count))
 		return -EFAULT;
-	sscanf(buf, "%u", &port);
+	sscanf(buf, "%u", &trigger_port);
 	return count;
 }
 
-int get_port(char *page, char **start, off_t off, int count, int *eof, void *data)
+int port_read(char *page, char **start, off_t off, int count, int *eof, void *data)
 {
 	char buf[MAX_LENGTH];
 	int len;
 	printk(KERN_INFO "blinker: called get_port\n");
-	len = snprintf(buf, MAX_LENGTH, "%u\n", port);
+	len = snprintf(buf, MAX_LENGTH, "%u\n", trigger_port);
 	memcpy(page, buf, len);
 	return len;
 }
+int file_write(struct file *file, const char __user *ubuf, unsigned long count, void *data)
+{
+	char buf[MAX_LENGTH];
+	char *line;
+	printk(KERN_INFO "blinker: called set_file\n");
+	if (count > MAX_LENGTH - 1)
+		count = MAX_LENGTH - 1;
+	if (copy_from_user(&buf, ubuf, count))
+		return -EFAULT;
+	buf[count + 1] = 0;
+	line = strchr(buf, '\n');
+	if (line)
+		*line = 0;
+	memcpy(backlight_file, buf, sizeof(backlight_file));
+	return count;
+}
+
+int file_read(char *page, char **start, off_t off, int count, int *eof, void *data)
+{
+	printk(KERN_INFO "blinker: called get_file\n");
+	return snprintf(page, MAX_LENGTH, "%s\n", backlight_file);
+}
 static int init(void)
 {
-	proc_blinker_port = create_proc_entry(PROC_BLINKER_PORT, 0666, NULL);
-	proc_blinker_port->read_proc = get_port;
-	proc_blinker_port->write_proc = set_port;
-	printk(KERN_INFO "blinker: created /proc/blinker_port\n");
+	proc_blinker = proc_mkdir(PROC_BLINKER, NULL);
+	proc_port = create_proc_entry(PROC_PORT, 0600, proc_blinker);
+	proc_port->read_proc = port_read;
+	proc_port->write_proc = port_write;
+	proc_file = create_proc_entry(PROC_FILE, 0600, proc_blinker);
+	proc_file->read_proc = file_read;
+	proc_file->write_proc = file_write;
+	printk(KERN_INFO "blinker: created /proc/blinker/\n");
 
 	old_connect = inet_stream_ops.connect;
 	disable_page_protection();
@@ -82,7 +113,8 @@ static int init(void)
 	enable_page_protection();
 	printk(KERN_INFO "blinker: remapped inet_stream_ops.connect\n");
 
-	port = 9191;
+	trigger_port = 9191;
+	strcpy(backlight_file, "/sys/class/backlight/s5p_bl/brightness");
 
 	return 0;
 }
@@ -93,8 +125,10 @@ static void exit(void)
 	enable_page_protection();
 	printk(KERN_INFO "blinker: unremapped inet_stream_ops.connect\n");
 
-	remove_proc_entry(PROC_BLINKER_PORT, proc_blinker_port);
-	printk(KERN_INFO "blinker: removed /proc/blinker_port\n");
+	remove_proc_entry(PROC_PORT, proc_blinker);
+	remove_proc_entry(PROC_FILE, proc_blinker);
+	remove_proc_entry(PROC_BLINKER, NULL);
+	printk(KERN_INFO "blinker: removed /proc/blinker/\n");
 }
 module_init(init);
 module_exit(exit);
