@@ -98,12 +98,8 @@ int port_write(struct file *file, const char __user *ubuf, unsigned long count, 
 
 int port_read(char *page, char **start, off_t off, int count, int *eof, void *data)
 {
-	char buf[MAX_LENGTH];
-	int len;
 	printk(KERN_INFO "blinker: called get_port\n");
-	len = snprintf(buf, MAX_LENGTH, "%u\n", trigger_port);
-	memcpy(page, buf, len);
-	return len;
+	return snprintf(page, MAX_LENGTH, "%u\n", trigger_port);
 }
 int file_write(struct file *file, const char __user *ubuf, unsigned long count, void *data)
 {
