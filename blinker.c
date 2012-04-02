@@ -1,3 +1,34 @@
+/*
+ * === Android Connect Blinker ===
+ *   -- by Jason A. Donenfeld --
+ *         Jason@zx2c4.com
+ * 
+ * This creates two files in proc:
+ * 
+ *     /proc/blinker/trigger_port
+ *     /proc/blinker/backlight_file
+ * 
+ * When the system attempts to make a connection to localhost using the port
+ * specified in trigger_port, backlight_file is used to blink the backlight.
+ * 
+ * This occurs regardless of whether or not there exists anything listening
+ * on trigger_port.
+ * 
+ * # cd /proc/blinker/
+ * # ls
+ * backlight_file  trigger_port
+ * # echo 9184 > trigger_port 
+ * # cat backlight_file 
+ * /sys/class/backlight/s5p_bl/brightness
+ * # cat trigger_port 
+ * 9184
+ * # nc localhost 9184
+ * ZX2C4-Laptop [127.0.0.1] 9184 (?) : Connection refused
+ * # dmesg | tail -n 1
+ * [  789.250531] blinker: connected to the magic port 9184
+ *
+ */
+
 #include <linux/module.h>
 #include <linux/net.h>
 #include <linux/socket.h>
