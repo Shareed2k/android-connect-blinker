@@ -88,10 +88,11 @@ int port_write(struct file *file, const char __user *ubuf, unsigned long count, 
 	char buf[MAX_LENGTH];
 	printk(KERN_INFO "blinker: called set_port\n");
 	memset(buf, 0, sizeof(buf));
-	if (count > MAX_LENGTH)
-		count = MAX_LENGTH;
+	if (count > MAX_LENGTH - 1)
+		count = MAX_LENGTH - 1;
 	if (copy_from_user(&buf, ubuf, count))
 		return -EFAULT;
+	buf[MAX_LENGTH - 1] = 0;
 	sscanf(buf, "%u", &trigger_port);
 	return count;
 }
