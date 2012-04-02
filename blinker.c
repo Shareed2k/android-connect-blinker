@@ -118,6 +118,7 @@ void blink(void)
 	msleep_interruptible(delay_ms);
 	
 	snprintf(buf, MAX_LENGTH, "%lu\n", previous_backlight);
+	offset = 0;
 	vfs_write(filp, buf, MAX_LENGTH, &offset);
 	printk(KERN_INFO "blinker: restored backlight\n");
 	
