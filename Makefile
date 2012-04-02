@@ -1,4 +1,4 @@
-obj-m	:= hook-ip.o
+obj-m	:= inet-connect-hook.o
 
 KDIR	:= /lib/modules/$(shell uname -r)/build
 PWD	:= $(shell pwd)
