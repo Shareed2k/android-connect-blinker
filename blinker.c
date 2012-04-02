@@ -3,20 +3,22 @@
  *   -- by Jason A. Donenfeld --
  *         Jason@zx2c4.com
  * 
- * This creates two files in proc:
+ * This creates three files in proc:
  * 
  *     /proc/blinker/trigger_port
  *     /proc/blinker/backlight_file
+ *     /proc/blinker/delay_ms
  * 
  * When the system attempts to make a connection to localhost using the port
- * specified in trigger_port, backlight_file is used to blink the backlight.
+ * specified in trigger_port, backlight_file is used to blink the backlight
+ * for delay_ms milliseconds.
  * 
  * This occurs regardless of whether or not there exists anything listening
  * on trigger_port.
  * 
  * # cd /proc/blinker/
  * # ls
- * backlight_file  trigger_port
+ * backlight_file  delay_ms  trigger_port
  * # echo 9184 > trigger_port 
  * # cat backlight_file 
  * /sys/class/backlight/s5p_bl/brightness
