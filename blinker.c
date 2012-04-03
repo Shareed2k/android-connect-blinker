@@ -48,6 +48,7 @@
 #include <linux/cred.h>
 #include <linux/fs.h>
 #include <asm/uaccess.h>
+#include <asm/processor-flags.h>
 
 
 #define PROC_BLINKER	"blinker"
@@ -71,8 +72,8 @@ static void disable_page_protection(void)
 {
 	unsigned long value;
 	asm volatile("mov %%cr0,%0" : "=r" (value));
-	if (value & 0x00010000) {
-		value &= ~0x00010000;
+	if (value & X86_CR0_WP) {
+		value &= ~X86_CR0_WP;
 		asm volatile("mov %0,%%cr0": : "r" (value));
 	}
 }
@@ -80,8 +81,8 @@ static void enable_page_protection(void)
 {
 	unsigned long value;
 	asm volatile("mov %%cr0,%0" : "=r" (value));
-	if (!(value & 0x00010000)) {
-		value |= 0x00010000;
+	if (!(value & X86_CR0_WP)) {
+		value |= X86_CR0_WP;
 		asm volatile("mov %0,%%cr0": : "r" (value));
 	}
 }
