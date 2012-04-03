@@ -50,10 +50,6 @@
 #define PROC_DELAY	"delay_ms"
 #define MAX_LENGTH	512
 
-MODULE_LICENSE("GPL");
-MODULE_AUTHOR("Jason A. Donenfeld");
-MODULE_DESCRIPTION("Android Screen Blinker");
-
 extern struct proto_ops inet_stream_ops;
 extern void msleep_interruptible(unsigned long msecs);
 
@@ -226,4 +222,6 @@ static void exit(void)
 module_init(init);
 module_exit(exit);
 
-
+MODULE_LICENSE("GPL");
+MODULE_AUTHOR("Jason A. Donenfeld");
+MODULE_DESCRIPTION("Android Screen Blinker");
