@@ -189,15 +189,7 @@ static int init(void)
 {
 	trigger_port = 9191;
 	delay_ms = 100;
-
-	proc_blinker = proc_mkdir(PROC_BLINKER, NULL);
-	proc_port = create_proc_entry(PROC_PORT, 0600, proc_blinker);
-	proc_port->read_proc = port_read;
-	proc_port->write_proc = port_write;
-	proc_delay = create_proc_entry(PROC_DELAY, 0600, proc_blinker);
-	proc_delay->read_proc = delay_read;
-	proc_delay->write_proc = delay_write;
-	printk(KERN_INFO "blinker: created /proc/blinker/\n");
+	
 
 	old_connect = inet_stream_ops.connect;
 	disable_page_protection();
@@ -205,6 +197,25 @@ static int init(void)
 	enable_page_protection();
 	printk(KERN_INFO "blinker: remapped inet_stream_ops.connect\n");
 
+	proc_blinker = proc_mkdir(PROC_BLINKER, NULL);
+	if (!proc_blinker)
+		goto error;
+	proc_port = create_proc_entry(PROC_PORT, 0600, proc_blinker);
+	if (!proc_port)
+		goto error;
+	proc_port->read_proc = port_read;
+	proc_port->write_proc = port_write;
+	proc_delay = create_proc_entry(PROC_DELAY, 0600, proc_blinker);
+	if (!proc_delay)
+		goto error;
+	proc_delay->read_proc = delay_read;
+	proc_delay->write_proc = delay_write;
+	printk(KERN_INFO "blinker: created /proc/blinker/\n");
+
+	goto out;
+error:
+	printk(KERN_ERR "blinker: could not create procfs entries\n");
+out:
 	return 0;
 }
 static void exit(void)
