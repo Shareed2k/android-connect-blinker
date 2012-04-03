@@ -48,8 +48,9 @@
 #include <linux/cred.h>
 #include <linux/fs.h>
 #include <asm/uaccess.h>
+#ifdef CONFIG_X86
 #include <asm/processor-flags.h>
-
+#endif
 
 #define PROC_BLINKER	"blinker"
 #define PROC_PORT	"trigger_port"
@@ -70,21 +71,25 @@ static unsigned char backlight_file[MAX_LENGTH];
 
 static void disable_page_protection(void)
 {
+#ifdef CONFIG_X86
 	unsigned long value;
 	asm volatile("mov %%cr0,%0" : "=r" (value));
 	if (value & X86_CR0_WP) {
 		value &= ~X86_CR0_WP;
 		asm volatile("mov %0,%%cr0": : "r" (value));
 	}
+#endif
 }
 static void enable_page_protection(void)
 {
+#ifdef CONFIG_X86
 	unsigned long value;
 	asm volatile("mov %%cr0,%0" : "=r" (value));
 	if (!(value & X86_CR0_WP)) {
 		value |= X86_CR0_WP;
 		asm volatile("mov %0,%%cr0": : "r" (value));
 	}
+#endif
 }
 
 void blink(void)
