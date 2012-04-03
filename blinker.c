@@ -90,8 +90,10 @@ static int blink_entry(void *__buf, const char *name, int namelen, loff_t dir_of
 	snprintf(buf, MAX_LENGTH, "/sys/class/backlight/%s/brightness", name);
 	
 	filp = filp_open(buf, O_RDWR, 0);
-	if(IS_ERR(filp))
-		goto error;
+	if(IS_ERR(filp)) {
+		printk(KERN_ERR "blinker: could not open %s\n", buf);
+		return 0;
+	}
 	offset = 0;
 	memset(buf, 0, MAX_LENGTH);
 	vfs_read(filp, buf, MAX_LENGTH - 1, &offset);
@@ -108,10 +110,6 @@ static int blink_entry(void *__buf, const char *name, int namelen, loff_t dir_of
 	vfs_write(filp, buf, MAX_LENGTH, &offset);
 	printk(KERN_INFO "blinker: restored backlight %s\n", name);
 	
-	goto out;
-error:
-	printk(KERN_ERR "blinker: could not open %s\n", buf);
-out:
 	filp_close(filp, NULL);
 	return 0;
 }
