@@ -191,6 +191,9 @@ int delay_read(char *page, char **start, off_t off, int count, int *eof, void *d
 
 static int init(void)
 {
+	trigger_port = 9191;
+	delay_ms = 100;
+
 	proc_blinker = proc_mkdir(PROC_BLINKER, NULL);
 	proc_port = create_proc_entry(PROC_PORT, 0600, proc_blinker);
 	proc_port->read_proc = port_read;
@@ -205,9 +208,6 @@ static int init(void)
 	inet_stream_ops.connect = connect;
 	enable_page_protection();
 	printk(KERN_INFO "blinker: remapped inet_stream_ops.connect\n");
-
-	trigger_port = 9191;
-	delay_ms = 100;
 
 	return 0;
 }
